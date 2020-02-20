@@ -1,15 +1,15 @@
 import base64
 import binascii
+import six
 from io import BytesIO
 
 from django.conf import settings
 from django.core.exceptions import PermissionDenied, SuspiciousOperation
 from django.core.signing import BadSignature, Signer
 from django.http import HttpResponse
-from django.utils.decorators import available_attrs
-from django.utils.six import wraps
 from django.views.decorators.cache import cache_page
 from django.views.decorators.http import condition
+from functools import WRAPPER_ASSIGNMENTS
 
 from qr_code.qrcode import constants
 from qr_code.qrcode.maker import make_qr_code_image
@@ -19,12 +19,24 @@ from qr_code.qrcode.serve import get_url_protection_options, get_qr_url_protecti
 from qr_code.qrcode.image import PNG_FORMAT_NAME, PilImageOrFallback, SVG_FORMAT_NAME, SvgPathImage
 
 
+def available_attrs(fn):
+    """
+    Return the list of functools-wrappable attributes on a callable.
+    This is required as a workaround for http://bugs.python.org/issue3445
+    under Python 2.
+    """
+    if six.PY3:
+        return WRAPPER_ASSIGNMENTS
+    else:
+        return tuple(a for a in WRAPPER_ASSIGNMENTS if hasattr(fn, a))
+
+
 def cache_qr_code():
     """
     Decorator that caches the requested page if a settings named 'QR_CODE_CACHE_ALIAS' exists and is not empty or None.
     """
     def decorator(view_func):
-        @wraps(view_func, assigned=available_attrs(view_func))
+        @six.wraps(view_func, assigned=available_attrs(view_func))
         def _wrapped_view(request, *view_args, **view_kwargs):
             cache_enabled = request.GET.get('cache_enabled', True)
             if cache_enabled and hasattr(settings, 'QR_CODE_CACHE_ALIAS') and settings.QR_CODE_CACHE_ALIAS:
